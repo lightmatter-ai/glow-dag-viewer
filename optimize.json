@@ -1,0 +1,149 @@
+{
+  "name": "DAG",
+  "directed": true,
+  "strict": false,
+  "rankdir": "TB",
+  "_subgraph_cnt": 0,
+  "objects": [
+    {
+      "_gvid": 0,
+      "name": "tmp_save",
+      "color": "black",
+      "fillcolor": "#B0E0E6ff",
+      "fontcolor": "black",
+      "label": "{{<Input>Input|<Output>Output}|{Save\\lName : tmp_save\\lInput : float\\<7 x 32 x 32 x 16\\>\\lOutput : float\\<7 x 32 x 32 x 16\\>\\lUsers : 0\\l}}",
+      "penwidth": "2",
+      "shape": "record",
+      "style": "filled,rounded"
+    },
+    {
+      "_gvid": 1,
+      "name": "Relu_2__1",
+      "color": "black",
+      "fillcolor": "#FFF0F5ff",
+      "fontcolor": "black",
+      "label": "{{<Input>Input}|{Relu\\lName : Relu_2__1\\lInput : float\\<7 x 32 x 32 x 16\\>\\lUsers : 1\\lResult : float\\<7 x 32 x 32 x 16\\>\\l}|{<Result>Result}}",
+      "penwidth": "2",
+      "shape": "record",
+      "style": "filled,rounded"
+    },
+    {
+      "_gvid": 2,
+      "name": "Conv_0__2",
+      "color": "black",
+      "fillcolor": "#FFE1FFff",
+      "fontcolor": "black",
+      "label": "{{<Input>Input|<Filter>Filter|<Bias>Bias}|{Convolution\\lName : Conv_0__2\\lInput : float\\<7 x 32 x 32 x 3\\>\\lFilter : float\\<16 x 3 x 3 x 3\\>\\lBias : float\\<16\\>\\lKernels : [3, 3]\\lStrides : [1, 1]\\lPads : [1, 1, 1, 1]\\lGroup : 1\\lDilation : [1, 1]\\lLayout : NHWC\\lFusedActivation : NONE\\lFusedActivationArgs : []\\lUsers : 1\\lResult : float\\<7 x 32 x 32 x 16\\>\\l}|{<Result>Result}}",
+      "penwidth": "2",
+      "shape": "record",
+      "style": "filled,rounded"
+    },
+    {
+      "_gvid": 3,
+      "name": "Conv_0__1",
+      "color": "black",
+      "fillcolor": "#87CEFAff",
+      "fontcolor": "black",
+      "label": "{{<Input>Input}|{Transpose\\lName : Conv_0__1\\lInput : float\\<7 x 3 x 32 x 32\\>\\lShuffle : [0, 2, 3, 1]\\lLayout : NHWC\\lUsers : 1\\lResult : float\\<7 x 32 x 32 x 3\\>\\l}|{<Result>Result}}",
+      "penwidth": "2",
+      "shape": "record",
+      "style": "filled,rounded"
+    },
+    {
+      "_gvid": 4,
+      "name": "input",
+      "color": "gray54",
+      "fillcolor": "#FFE4E1b1",
+      "fontcolor": "gray40",
+      "label": "{{Placeholder\\lName : input\\lLayout : *\\lOutput : float\\<7 x 3 x 32 x 32\\>\\lTrainable : 0\\lStatic : 0\\lUsers : 1\\l}|{<Output>Output}}",
+      "penwidth": "2",
+      "shape": "record",
+      "style": "filled,rounded"
+    },
+    {
+      "_gvid": 5,
+      "name": "conv1_weight__1",
+      "color": "DeepSkyBlue4",
+      "fillcolor": "#CDC9C9b1",
+      "fontcolor": "gray40",
+      "label": "{{Constant\\lName : conv1_weight__1\\lLayout : NHWC\\lOutput : float\\<16 x 3 x 3 x 3\\>\\lUsers : 1\\l}|{<Output>Output}}",
+      "penwidth": "2",
+      "shape": "record",
+      "style": "filled,rounded"
+    },
+    {
+      "_gvid": 6,
+      "name": "conv_bias__19",
+      "color": "DeepSkyBlue4",
+      "fillcolor": "#CDC9C9b1",
+      "fontcolor": "gray40",
+      "label": "{{Constant\\lName : conv_bias__19\\lLayout : *\\lOutput : float\\<16\\>\\lUsers : 1\\l}|{<Output>Output}}",
+      "penwidth": "2",
+      "shape": "record",
+      "style": "filled,rounded"
+    },
+    {
+      "_gvid": 7,
+      "name": "tmp__1",
+      "color": "black",
+      "fillcolor": "#FFE4E1ff",
+      "fontcolor": "black",
+      "label": "{{Placeholder\\lName : tmp__1\\lLayout : *\\lOutput : float\\<7 x 32 x 32 x 16\\>\\lTrainable : 0\\lStatic : 0\\lUsers : 2\\l}|{<Output>Output}}",
+      "penwidth": "2",
+      "shape": "record",
+      "style": "filled,rounded"
+    }
+  ],
+  "edges": [
+    {
+      "_gvid": 6,
+      "tail": 7,
+      "head": 0,
+      "dir": "both",
+      "headport": "Output",
+      "tailport": "Output"
+    },
+    {
+      "_gvid": 5,
+      "tail": 6,
+      "head": 2,
+      "headport": "Bias",
+      "tailport": "Output"
+    },
+    {
+      "_gvid": 4,
+      "tail": 5,
+      "head": 2,
+      "headport": "Filter",
+      "tailport": "Output"
+    },
+    {
+      "_gvid": 3,
+      "tail": 4,
+      "head": 3,
+      "headport": "Input",
+      "tailport": "Output"
+    },
+    {
+      "_gvid": 2,
+      "tail": 3,
+      "head": 2,
+      "headport": "Input",
+      "tailport": "Result"
+    },
+    {
+      "_gvid": 1,
+      "tail": 2,
+      "head": 1,
+      "headport": "Input",
+      "tailport": "Result"
+    },
+    {
+      "_gvid": 0,
+      "tail": 1,
+      "head": 0,
+      "headport": "Input",
+      "tailport": "Result"
+    }
+  ]
+}

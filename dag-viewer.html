@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<body>
+<div class="content">
+</div>
+
+<script src="https://d3js.org/d3.v5.min.js"></script>
+<script src="https://d3js.org/d3-request.v1.min.js"></script>
+<script src="https://d3js.org/d3-zoom.v1.min.js"></script>
+
+<script>
+
+/*
+ * References
+ * automated text sizing:  https://bl.ocks.org/mbostock/1846692
+ * svg text methods:       https://developer.mozilla.org/en-US/docs/Web/API/SVGTextContentElement
+ * tspan example:          https://bl.ocks.org/mbostock/7555321
+ *                         https://northlandia.wordpress.com/2014/10/23/ten-best-practices-for-coding-with-d3/
+ *                         https://bost.ocks.org/mike/d3/workshop
+ * dragging:               https://bl.ocks.org/mbostock/ad70335eeef6d167bc36fd3c04378048
+ * Mouseover/ensure vis:   https://bl.ocks.org/martinjc/7aa53c7bf3e411238ac8aef280bd6581
+ * Force testing ground:   https://bl.ocks.org/steveharoz/8c3e2524079a8c440df60c1ab72b5d03
+ * Mousewheel zoom:        https://bl.ocks.org/mbostock/2206340
+ * Zoom and pan:           https://coderwall.com/p/psogia/simplest-way-to-add-zoom-pan-on-d3-js
+ * Documentation:          https://github.com/d3/d3-force
+ *
+ * TODO
+ *   select the filename instead of hardcoded
+ *   hierarchical layout (use as gravity hint to replace _gvid)
+ *     https://d3-wiki.readthedocs.io/zh_CN/master/Hierarchy-Layout/
+ *   inports, outports (connection points at top and bottom instead of object center)
+ *   replace straight link lines with splines
+ *   use new json output instead of converted dot
+ *
+ *   use web worker thread https://html.spec.whatwg.org/multipage/workers.html
+ *
+ */
+
+d3.json("/optimize.json", function(error, indata) {
+  if (error) throw error;
+
+// Create a node lookup table
+var nodes = {};
+indata.objects.forEach(function(object) {
+  object.uplinks = 0;
+  object.dnlinks = 0;
+  nodes[object._gvid] = object;
+});
+
+// Need siblings to set up force- two steps to create the links
+children = {};
+siblings = [];
+
+// 1. Discover all children
+indata.edges.forEach(function(edge) {
+  edge.source = nodes[edge.tail];
+  edge.target = nodes[edge.head];
+  nodes[edge.tail].dnlinks += 1;
+  nodes[edge.head].uplinks += 1;
+
+  if (!(edge.head in children)) { children[edge.head] = []; }
+  children[edge.head].push(edge.tail);
+});
+
+// 2. If there is more than 1 child, create links for sibling pairs
+for (var k in children) {
+  a = children[k];
+  if (a.length > 1) {
+    for (var i=0; i<a.length; i++)
+      for (var j=i+1; j<a.length; j++) {
+        siblings.push( {source:a[i], target:a[j]} );
+      }
+  }
+}
+
+// Default globals
+var g_textsize        = 10,
+    g_width           = 5000,
+    g_height          = g_width,
+
+    g_bgcolor         = "#eee",
+    g_bglinecolor     = "gray",
+    g_bglinewidth     = 1,
+
+    g_nodemargin      = 4,
+    g_nodetextcolor   = "magenta",
+    g_nodelinecolor   = "#655",
+    g_nodebgcolor     = "ivory",
+    g_noderadius      = g_textsize * 2 / 3,
+    g_nodelinewidth   = 1,
+    g_nodefont        = "300 " + g_textsize + "px Times",
+    g_textwidth       = 40,
+
+    g_arrowlinewidth  = 1,
+    g_arrowlinecolor  = "gray",
+
+    g_initialScale    = 0.8
+  ;
+
+// Create canvas
+var svg = d3.select("div.content").append("svg")
+  .attr("width", g_width)
+  .attr("height", g_height);
+
+// Fill the canvas background
+svg.append("rect")
+  .attr("width", "100%")
+  .attr("height", "100%")
+  .style("fill", g_bgcolor)
+  .style("stroke", g_bglinecolor )
+  .style("stroke-width", g_bglinewidth + "px")
+  ;
+
+// =============================================================================
+var sim = d3.forceSimulation()
+  .nodes(d3.values(nodes))
+  .force('center', d3.forceCenter(800,600))
+  .force("collide", d3.forceCollide().radius(170))
+  .force("link", d3.forceLink().links(indata.edges))
+  .force("siblings", d3.forceLink().links(siblings))
+  .force("y", d3.forceY(function(d) { return -d._gvid * 1000; }))
+  .on("tick", tick)
+  ;
+// =============================================================================
+
+// Create objects
+
+// Helper for coloring fonts
+function nodetextcolor(node) {
+  return node.fontcolor;
+};
+
+// Create object group and its text field
+var allnodes = svg.append("g")
+  .attr("class", "mynodes")
+  .selectAll()
+  .data(sim.nodes())
+  .enter().append("g")
+    .attr("class", "mynode")
+    .append("text")
+      .attr("class", "mynode")
+      .attr("x", 0)
+      .attr("y", g_textsize)
+      .attr("dy", ".35em")
+      //.attr("text-anchor", "middle")
+      .style("font", g_nodefont)
+      .style("fill", function(d) {return nodetextcolor(d); } );
+  ;
+
+// TODO: not needed if a custom json output replaces converted dot format
+// Helper for label parsing
+function parse(label) {
+// "label": "{{<Input>Input|<Filter>Filter|<Bias>Bias}|{Convolution\\lName : Conv_0__2\\lInput : float\\<7 x 32 x 32 x 3\\>\\lFilter : float\\<16 x 3 x 3 x 3\\>\\lBias : float\\<16\\>\\lKernels : [3, 3]\\lStrides : [1, 1]\\lPads : [1, 1, 1, 1]\\lGroup : 1\\lDilation : [1, 1]\\lLayout : NHWC\\lFusedActivation : NONE\\lFusedActivationArgs : []\\lUsers : 1\\lResult : float\\<7 x 32 x 32 x 16\\>\\l}|{<Result>Result}}",
+  lout = 
+    {
+    "in" : ["Input", "Filter", "Bias" ],
+    "body" : [
+      "Name : Conv_0__2", 
+      "Input : float <7 x 32 x 32 x 3 >",
+      "Filter : float <16 x 3 x 3 x 3 >",
+      "Bias : float <16 >",
+      "Kernels : [3, 3]",
+      "Strides : [1, 1]",
+      "Pads : [1, 1, 1, 1]",
+      "Group : 1",
+      "Dilation : [1, 1]",
+      "Layout : NHWC",
+      "FusedActivation : NONE",
+      "FusedActivationArgs : []",
+      "Users : 1",
+      "Result : float <7 x 32 x 32 x 16 >"
+      ],
+    "out" : ["Result"]
+    }
+
+  // Split by {}
+  // for in, remove <> terms
+  // for body, split by \\l and remove other \\
+  // for out, remove <> terms
+  return lout;
+}
+
+// Helper for tspan creation
+function filler(d) {
+  var text = d3.select(this),
+      y = text.attr("y"),
+      dy = parseFloat(text.attr("dy")),
+      iy = 0
+      ;
+  tspan = text.append("tspan").attr("x", 0).attr("y", y * iy++).attr("dy", dy + "em").text(function (d) { return (d.name); }); iy += 0.5;
+  tspan = text.append("tspan").attr("x", 0).attr("y", y * iy++).attr("dy", dy + "em").text(function (d) { return (d.label); });
+  tspan.style("color", g_nodetextcolor);
+  // Ensure reasonable width by splitting a tspan by words
+  function splitter() {
+    var width = g_textwidth,
+        word,
+        line = [],
+        tspan = d3.select(this),
+        words = tspan.text().split(/[\s\/]+/).reverse()
+        ;
+    while ((word = words.pop()) || (words.length > 0)) {
+      line.push(word);
+      tspan.text(line.join(" "));
+      if (tspan.text().length > width) {
+        line.pop();
+        tspan.text(line.join(" "));
+        line = [word];
+        tspan = text.append("tspan").attr("x", 0).attr("y", y * iy++).attr("dy", dy + "em").text(word);
+      }
+    }
+  };
+  tspan.each(splitter);
+  // TODO: remove these extra developer details 
+  text.append("tspan").attr("x", 0).attr("y", y * iy++).attr("dy", dy + "em")
+      .text(function (d) { return "up " + d.uplinks + " dn " + d.dnlinks + " _gvid " + d._gvid; });
+};
+
+// Add tspan fields to object group
+var alltexts = d3.selectAll("svg g text.mynode");
+alltexts.each(filler);
+
+// Helper for coloring lines
+function nodelinecolor(node) {
+  return node.color;
+};
+
+// Helper for coloring background
+function nodebackgroundcolor(node) {
+  return node.fillcolor;
+};
+
+function getports() {
+  return;
+};
+
+// Add object group outline and background
+var allrects = svg.selectAll("svg g.mynode")
+  .insert("rect")
+    .attr("x",       function()  { x = this.parentNode.getBBox().x - g_nodemargin; return x; } )
+    .attr("y",       function(d) { y = this.parentNode.getBBox().y - g_nodemargin; d.ytop = y; return y; } )
+    .attr("width",   function(d) { w = this.parentNode.getBBox().width + 2 * g_nodemargin; d.w2 = w / 2; return w; } )
+    .attr("height",  function(d) { h = this.parentNode.getBBox().height + 2 * g_nodemargin; d.ybot = h; return h;} )
+    .attr("rx",      g_noderadius)
+    .attr("ry",      g_noderadius)
+    .style("fill",   function(d) { return nodebackgroundcolor(d); } )
+    .style("stroke", function(d) { return nodelinecolor(d); } )
+    .style("stroke-width", g_nodelinewidth + "px")
+  ;
+
+// Fixup the ordering in the DOM
+allrects.each( function() { p = this.parentNode; p.insertBefore(this, p.firstChild); } )
+
+// Create object group separator line (below object name)
+var allseps = svg.selectAll("svg g.mynode")
+  .append("line")
+    .attr("x1", function() { bb = this.parentNode.getBBox(); return bb.x; } )
+    .attr("y1", function() { return this.parentNode.getBBox().y + g_textsize * 1.75; } )
+    .attr("x2", function() { bb = this.parentNode.getBBox(); return bb.x + bb.width; } )
+    .attr("y2", function() { return this.parentNode.getBBox().y + g_textsize * 1.75; } )
+    .style("stroke", function(d) { return nodelinecolor(d); } )
+    .style("stroke-width", g_nodelinewidth + "px")
+  ;
+
+var allgroups = svg.selectAll("svg g.mynode");
+
+// Draw lines for the links
+var alllinks = svg.selectAll("svg g.mynodes")
+  .selectAll()
+  .data(indata.edges)
+  .enter().append("line")
+    .style("stroke", g_arrowlinecolor)
+    .style("stroke-width", g_arrowlinewidth + "px")
+    .text(function(d,i) { return i; })
+  ;
+
+function tick() {
+  allgroups.attr("transform", transform)
+  alllinks
+    .attr("x1", function(d) { return d.source.x + d.source.w2; })
+    .attr("y1", function(d) { return d.source.y + d.source.ytop + d.source.ybot; })
+    .attr("x2", function(d) { return d.target.x + d.target.w2; })
+    .attr("y2", function(d) { return d.target.y + d.target.ytop; })
+  ;
+}
+
+function transform(d) { return "translate(" + d.x + "," + d.y + ")"; }
+
+var zoom = d3.zoom()
+  .on("zoom", function() {
+    d3.selectAll("svg g.mynodes").attr("transform", d3.event.transform);
+  })
+;
+
+svg.call(zoom)
+  .call(zoom.transform, d3.zoomIdentity
+    .translate(0,0).scale(g_initialScale)
+  )
+;
+
+});
+
+</script>
+</body>
